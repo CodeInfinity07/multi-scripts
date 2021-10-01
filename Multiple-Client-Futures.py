@@ -6,7 +6,6 @@ Created on Sun Sep 26 15:02:49 2021
 @author: ryzon
 """
 
-import socket
 import os
 import datetime
 import pandas_ta as pta
@@ -20,11 +19,13 @@ from binance import ThreadedWebsocketManager
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
 import logging
-import tkinter as tk
 import re
-from dotenv import load_dotenv
 import time
 import mysql.connector
+import ray
+
+ray.init()
+updater = Updater('2028793873:AAFAHKocwFb8aFA5aGVRIAgnL0Tm2ycHhGc', use_context=True)
 
 try:
     connection = mysql.connector.connect(host='localhost',
@@ -34,11 +35,6 @@ try:
 except Exception as e:
     print(e)
 
-ClientMultiSocket = socket.socket()
-host = '127.0.0.1'
-port = 2022
-
-load_dotenv()
 ts = time.time()
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 testnet_api_key = os.getenv('FUTURES_TESTNET_API_KEY')
@@ -188,8 +184,32 @@ def buy_stop_symbol(symbol, quantity, price, st_price, ts):
     except BinanceOrderException as e:
         return e
 
-def parser(msg):
-    target = msg
+
+def parser(update, context):
+    global client
+    global client2
+    try:
+        temp = update.message.text
+    except:
+        temp = update.channel_post.text
+    target = temp.lower()
+    sql_select_Query = "select * from clients"
+    cursor = connection.cursor()
+    cursor.execute(sql_select_Query)
+    records = cursor.fetchall()
+    for row in records:
+        testnet_api_key = row[1]
+        testnet_secret_key = row[2]
+        client = Client(testnet_api_key, testnet_secret_key, testnet=True)
+        client2 = Client(testnet_api_key, testnet_secret_key)
+        BUY_PERCENT = row[3]
+        SELL_PERCENT = row[4]
+        ST_PRICE_PERCENT = row[5]
+        DEFAULT_USDT = row[6]
+        hatcher.remote(target,BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,DEFAULT_USDT)
+  
+@ray.remote
+def hatcher(target,BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,DEFAULT_USDT):
     if "zone" in target:
         pass
     elif "close" in target:
@@ -343,33 +363,8 @@ def parser(msg):
         except Exception as e:
             print(e)
 
-try:
-    ClientMultiSocket.connect((host, port))
-except socket.error as e:
-    print(str(e))
 
-res = ClientMultiSocket.recv(1024)
-while True:
-    global client
-    global client2
-    global BUY_PERCENT
-    global SELL_PERCENT
-    global ST_PRICE_PERCENT
-    global DEFAULT_USDT
-    res = ClientMultiSocket.recv(1024)
-    sql_select_Query = "select * from clients"
-    cursor = connection.cursor()
-    cursor.execute(sql_select_Query)
-    records = cursor.fetchall()
-    for row in records:
-        testnet_api_key = row[1]
-        testnet_secret_key = row[2]
-        client = Client(testnet_api_key, testnet_secret_key, testnet=True)
-        client2 = Client(testnet_api_key, testnet_secret_key)
-        BUY_PERCENT = row[3]
-        SELL_PERCENT = row[4]
-        ST_PRICE_PERCENT = row[5]
-        DEFAULT_USDT = row[6]
-        parser(res.decode('utf-8'))
+updater.dispatcher.add_handler(MessageHandler(Filters.text & (~Filters.command), parser))
+updater.start_polling(timeout=30)
+updater.idle()
 
-ClientMultiSocket.close()

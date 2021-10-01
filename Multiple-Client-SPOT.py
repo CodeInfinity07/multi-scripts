@@ -5,7 +5,6 @@ Created on Sun Sep 26 10:05:16 2021
 
 @author: ryzon
 """
-import socket
 import asyncio
 import os
 import datetime
@@ -19,12 +18,16 @@ from time import sleep
 from binance import ThreadedWebsocketManager
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
-import logging
-import tkinter as tk
 import re
-from dotenv import load_dotenv
 import mysql.connector
+import logging
+import ray
 
+ray.init()
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
+updater = Updater('2028793873:AAFAHKocwFb8aFA5aGVRIAgnL0Tm2ycHhGc', use_context=True)
 try:
     connection = mysql.connector.connect(host='localhost',
                                          database='binance',
@@ -32,14 +35,6 @@ try:
                                          password='zain0980')
 except Exception as e:
     print(e)
-
-ClientMultiSocket = socket.socket()
-host = '127.0.0.1'
-port = 2022
-
-load_dotenv()
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
 def nospecial(text):
 	text = re.sub("[^a-zA-Z0-9]+", " ",text)
@@ -95,9 +90,31 @@ def sell_oco_symbol(symbol, quantity, r, t_price , t_limit_price):
     except BinanceOrderException as e:
         return e
 
-async def parser(msg,BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,STL_PRICE_PERCENT,DEFAULT_USDT):
-    temp = msg
+def parser(update, context):
+    global client
+    try:
+        temp = update.message.text
+    except:
+        temp = update.channel_post.text
     target = temp.lower()
+    sql_select_Query = "select * from clients"
+    cursor = connection.cursor()
+    cursor.execute(sql_select_Query)
+    records = cursor.fetchall()
+    for row in records:
+        testnet_api_key = str(row[7])
+        testnet_secret_key = str(row[8])
+        client = Client(testnet_api_key, testnet_secret_key)
+        client.API_URL = 'https://testnet.binance.vision/api'
+        BUY_PERCENT = float(row[9])
+        SELL_PERCENT = float(row[10])
+        ST_PRICE_PERCENT = float(row[11])
+        STL_PRICE_PERCENT = float(row[12])
+        DEFAULT_USDT = float(row[13])
+        hatcher.remote(target, BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,STL_PRICE_PERCENT,DEFAULT_USDT)
+    
+@ray.remote
+def hatcher(target,BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,STL_PRICE_PERCENT,DEFAULT_USDT):
     if "zone" in target:
         pass
     elif "short" in target:
@@ -178,29 +195,7 @@ async def parser(msg,BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,STL_PRICE_PERCENT
                 print(e)
         except Exception as e:
             print(e)
-try:
-    ClientMultiSocket.connect((host, port))
-except socket.error as e:
-    print(str(e))
-
-res = ClientMultiSocket.recv(1024)
-while True:
-    global client
-    res = ClientMultiSocket.recv(1024)
-    sql_select_Query = "select * from clients"
-    cursor = connection.cursor()
-    cursor.execute(sql_select_Query)
-    records = cursor.fetchall()
-    for row in records:
-        testnet_api_key = str(row[7])
-        testnet_secret_key = str(row[8])
-        client = Client(testnet_api_key, testnet_secret_key)
-        client.API_URL = 'https://testnet.binance.vision/api'
-        BUY_PERCENT = float(row[9])
-        SELL_PERCENT = float(row[10])
-        ST_PRICE_PERCENT = float(row[11])
-        STL_PRICE_PERCENT = float(row[12])
-        DEFAULT_USDT = float(row[13])
-        asyncio.run(parser(res.decode('utf-8'),BUY_PERCENT,SELL_PERCENT,ST_PRICE_PERCENT,STL_PRICE_PERCENT,DEFAULT_USDT))
-
-ClientMultiSocket.close()
+                
+updater.dispatcher.add_handler(MessageHandler(Filters.text & (~Filters.command), parser))
+updater.start_polling(timeout=30)
+updater.idle()
