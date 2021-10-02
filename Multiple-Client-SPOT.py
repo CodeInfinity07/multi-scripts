@@ -8,13 +8,8 @@ Created on Sun Sep 26 10:05:16 2021
 import asyncio
 import os
 import datetime
-import pandas_ta as pta
-import btalib
-import pandas as pd
-import json
 from binance.client import Client
 from binance.exceptions import BinanceAPIException, BinanceOrderException
-from time import sleep
 from binance import ThreadedWebsocketManager
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
@@ -29,10 +24,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 updater = Updater('2028793873:AAFAHKocwFb8aFA5aGVRIAgnL0Tm2ycHhGc', use_context=True)
 try:
-    connection = mysql.connector.connect(host='localhost',
-                                         database='binance',
-                                         user='root',
-                                         password='zain0980')
+    connection = mysql.connector.connect(host='166.62.25.253',
+                                         database='binance-db',
+                                         user='mitesh_jb',
+                                         password='MITESHmitesh@2')
 except Exception as e:
     print(e)
 
