@@ -20,7 +20,7 @@ import mysql.connector
 import ray
 
 ray.init()
-updater = Updater('2028793873:AAFAHKocwFb8aFA5aGVRIAgnL0Tm2ycHhGc', use_context=True)
+updater = Updater('2016978147:AAF8codQ1KDR7o9GhUQrhLUE2DEfKStSxbo', use_context=True)
 
 try:
     connection = mysql.connector.connect(host='166.62.25.253',
